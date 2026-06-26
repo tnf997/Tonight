@@ -9,6 +9,7 @@ import {
   Dimensions,
   ImageBackground,
   PanResponder,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -31,8 +32,14 @@ type Recipe = {
   photo_url: string | null;
 };
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const SWIPE_THRESHOLD = SCREEN_WIDTH * 0.22;
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const CARD_WIDTH = Math.min(SCREEN_WIDTH * 0.8, 500);
+const CARD_HEIGHT = Math.min(SCREEN_HEIGHT * 0.6, 520);
+const SWIPE_THRESHOLD = CARD_WIDTH * 0.22;
+const isIPad = Platform.OS === 'ios' && SCREEN_WIDTH >= 768;
+const BG = isIPad
+  ? require('../../assets/images/home-bg-ipad.png')
+  : require('../../assets/images/home-bg.png');
 
 const STRIP_WORDS = [
   "great value", "rao's", "raos", "breakstone's", "breakstones",
@@ -69,8 +76,6 @@ function ingredientIsAvailable(ingredientName: string, pantryNames: string[]) {
   });
 }
 
-const BG = require('../../assets/images/home-bg.png');
-
 export default function HomeScreen() {
   const router = useRouter();
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -102,6 +107,7 @@ export default function HomeScreen() {
         .from('recipes')
         .select('id, name, time_minutes, servings, tags, ingredients, steps, calories, protein_g, carbs_g, fat_g, photo_url')
         .eq('user_id', userId)
+        .eq('meal_type', 'dinner')
         .order('created_at', { ascending: false }),
     ]);
 
@@ -285,8 +291,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   card: {
-    width: SCREEN_WIDTH * 0.8,
-    height: 420,
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
     backgroundColor: '#FFFEFA',
     borderRadius: 20,
   },

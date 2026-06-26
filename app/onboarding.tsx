@@ -138,6 +138,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     marginHorizontal: 18,
     marginBottom: 12,
+    fontSize: 14,
+    letterSpacing: 0,
   },
   categoryLabel: {
     fontSize: 11,

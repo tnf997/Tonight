@@ -1,3 +1,4 @@
+import OfflineBanner from '@/components/OfflineBanner';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { supabase } from '@/lib/supabase';
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
@@ -55,6 +56,7 @@ export default function RootLayout() {
         <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: false }} />
       </Stack>
       <StatusBar style="auto" />
+      <OfflineBanner />
     </ThemeProvider>
   );
 }

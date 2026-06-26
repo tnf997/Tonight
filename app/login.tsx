@@ -18,6 +18,7 @@ export default function LoginScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit() {
@@ -61,16 +62,59 @@ export default function LoginScreen() {
     }
   }
 
+  async function handleVerifyCode() {
+    if (!code.trim()) {
+      Alert.alert('Code required', 'Please enter the code from your email.');
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.auth.verifyOtp({
+      email: email.trim(),
+      token: code.trim(),
+      type: 'signup',
+    });
+    setLoading(false);
+    if (error) {
+      Alert.alert('Invalid code', 'The code you entered is incorrect or has expired. Please try again.');
+      return;
+    }
+    router.replace('/onboarding');
+  }
+
+  async function handleResendCode() {
+    setLoading(true);
+    const { error } = await supabase.auth.resend({ type: 'signup', email: email.trim() });
+    setLoading(false);
+    if (error) {
+      Alert.alert('Error', error.message);
+      return;
+    }
+    Alert.alert('Code sent', 'Check your email for a new code.');
+  }
+
   if (mode === 'verify') {
     return (
       <View style={styles.container}>
         <Text style={styles.title}>Tonight</Text>
         <Text style={styles.verifyTitle}>Check your email</Text>
         <Text style={styles.verifyBody}>
-          We sent a confirmation link to {email}. Click it to verify your account, then come back and log in.
+          We sent a code to {email}. Enter it below to confirm your account.
         </Text>
-        <Pressable style={styles.button} onPress={() => setMode('login')}>
-          <Text style={styles.buttonText}>Go to log in</Text>
+        <TextInput
+          style={[styles.input, styles.codeInput]}
+          placeholder="········"
+          value={code}
+          onChangeText={setCode}
+          keyboardType="number-pad"
+          maxLength={8}
+          autoFocus
+          autoCorrect={false}
+        />
+        <Pressable style={styles.button} onPress={handleVerifyCode} disabled={loading}>
+          <Text style={styles.buttonText}>{loading ? 'Verifying...' : 'Verify code'}</Text>
+        </Pressable>
+        <Pressable onPress={handleResendCode}>
+          <Text style={styles.toggle}>Didn't get it? Resend code</Text>
         </Pressable>
       </View>
     );
@@ -151,6 +195,12 @@ const styles = StyleSheet.create({
     color: '#3A322A',
     fontSize: 14,
     letterSpacing: 0,
+  },
+  codeInput: {
+    fontSize: 24,
+    textAlign: 'center',
+    letterSpacing: 8,
+    height: 56,
   },
   passwordHint: {
     fontSize: 11,

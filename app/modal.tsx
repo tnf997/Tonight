@@ -117,22 +117,33 @@ export default function AddRecipeScreen() {
     }
   }
 
+  
   async function uploadPhoto(userId: string): Promise<string | null> {
     if (!photoUri) return existingPhotoUrl;
     try {
       const response = await fetch(photoUri);
       const blob = await response.blob();
+
+      if (blob.size > 5 * 1024 * 1024) {
+        Alert.alert('Photo too large', 'Please choose a photo under 5MB.');
+        return existingPhotoUrl;
+      }
+
       const arrayBuffer = await new Response(blob).arrayBuffer();
       const uint8Array = new Uint8Array(arrayBuffer);
       const fileName = `${userId}/${Date.now()}.jpg`;
+      console.log('Uploading to path:', fileName);
+      console.log('userId used:', userId);
+
       const { error } = await supabase.storage
         .from('recipe-photos')
         .upload(fileName, uint8Array, { contentType: 'image/jpeg', upsert: true });
       if (error) throw error;
       const { data } = supabase.storage.from('recipe-photos').getPublicUrl(fileName);
       return data.publicUrl;
-    } catch (err) {
-      console.error('Photo upload failed:', err);
+    } catch (err: any) {
+      console.error('Photo upload failed:', JSON.stringify(err, null, 2));
+      Alert.alert('Upload error', JSON.stringify({ message: err?.message, status: err?.status, statusCode: err?.statusCode, error: err?.error }, null, 2));
       return null;
     }
   }
