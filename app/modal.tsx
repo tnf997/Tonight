@@ -130,21 +130,54 @@ export default function AddRecipeScreen() {
     }
   }
 
-  async function handleParsePhoto() {
-    const permission = await ImagePicker.requestCameraPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert('Permission needed', 'Please allow camera access in Settings.');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-    });
-    if (result.canceled || !result.assets[0]) return;
+ async function handleParsePhoto() {
+    Alert.alert(
+      'Add recipe from photo',
+      'Choose how to add your photo',
+      [
+        {
+          text: 'Take a photo',
+          onPress: async () => {
+            const permission = await ImagePicker.requestCameraPermissionsAsync();
+            if (!permission.granted) {
+              Alert.alert('Permission needed', 'Please allow camera access in Settings.');
+              return;
+            }
+            const result = await ImagePicker.launchCameraAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              quality: 0.8,
+            });
+            if (!result.canceled && result.assets[0]) {
+              await processImage(result.assets[0].uri);
+            }
+          },
+        },
+        {
+          text: 'Choose from library',
+          onPress: async () => {
+            const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            if (!permission.granted) {
+              Alert.alert('Permission needed', 'Please allow photo library access in Settings.');
+              return;
+            }
+            const result = await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ImagePicker.MediaTypeOptions.Images,
+              quality: 0.8,
+            });
+            if (!result.canceled && result.assets[0]) {
+              await processImage(result.assets[0].uri);
+            }
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  }
 
+  async function processImage(uri: string) {
     setParsing(true);
     try {
-      const response = await fetch(result.assets[0].uri);
+      const response = await fetch(uri);
       const blob = await response.blob();
       const arrayBuffer = await new Response(blob).arrayBuffer();
       const bytes = new Uint8Array(arrayBuffer);
@@ -360,7 +393,12 @@ export default function AddRecipeScreen() {
           <Text style={styles.headerTitle}>Paste recipe</Text>
           <View style={{ width: 20 }} />
         </View>
-        <View style={{ flex: 1, paddingHorizontal: 18 }}>
+        <KeyboardAwareScrollView
+          contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40, flex: 1 }}
+          enableOnAndroid
+          keyboardShouldPersistTaps="handled"
+          extraScrollHeight={20}
+        >
           <Text style={styles.pasteLabel}>
             Copy a recipe from anywhere — a website, notes app, message — and paste it below.
           </Text>
@@ -376,7 +414,7 @@ export default function AddRecipeScreen() {
           <Pressable style={styles.saveBtn} onPress={handleParseText} disabled={parsing}>
             <Text style={styles.saveBtnText}>Extract recipe</Text>
           </Pressable>
-        </View>
+        </KeyboardAwareScrollView>
       </View>
     );
   }

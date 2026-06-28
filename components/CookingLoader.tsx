@@ -26,6 +26,12 @@ function FallingVeggie({
           easing: Easing.in(Easing.quad),
           useNativeDriver: true,
         }),
+        Animated.timing(anim, {
+          toValue: 0,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+        Animated.delay(duration * 2 - delay),
       ])
     );
     loop.start();
@@ -49,9 +55,9 @@ export default function CookingLoader() {
   return (
     <View style={styles.wrapper}>
       <View style={styles.dropZone}>
-        <FallingVeggie color="#D85A30" shape="circle" left={10} delay={0} duration={950} />
-        <FallingVeggie color="#EF9F27" shape="oval" left={38} delay={300} duration={950} />
-        <FallingVeggie color="#639922" shape="circle" left={66} delay={600} duration={950} />
+        <FallingVeggie color="#D85A30" shape="carrot" left={10} delay={0} duration={950} />
+        <FallingVeggie color="#EF9F27" shape="lemon" left={38} delay={300} duration={950} />
+        <FallingVeggie color="#639922" shape="bay leaf" left={66} delay={600} duration={950} />
       </View>
       <View style={styles.pot}>
         <View style={[styles.handle, { left: -8 }]} />
