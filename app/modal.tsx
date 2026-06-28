@@ -5,6 +5,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 
 const availableTags = ['Gluten-free', 'Vegetarian', 'Quick'];
 const mealTypes = [
@@ -17,13 +18,20 @@ const mealTypes = [
 
 type IngredientRow = { id: string; name: string; amount: string };
 type StepRow = { id: string; text: string };
+type Mode = 'choose' | 'manual' | 'paste' | 'photo';
+
+const SUPABASE_FUNCTION_URL = `https://zeygfnojyyajgmrfwqsh.supabase.co/functions/v1/parse-recipe`;
 
 export default function AddRecipeScreen() {
   const router = useRouter();
   const { editId } = useLocalSearchParams<{ editId?: string }>();
   const isEditMode = !!editId;
 
+  const [mode, setMode] = useState<Mode>(isEditMode ? 'manual' : 'choose');
   const [loadingExisting, setLoadingExisting] = useState(isEditMode);
+  const [parsing, setParsing] = useState(false);
+  const [pasteText, setPasteText] = useState('');
+
   const [name, setName] = useState('');
   const [mealType, setMealType] = useState('dinner');
   const [timeMinutes, setTimeMinutes] = useState('');
@@ -71,6 +79,101 @@ export default function AddRecipeScreen() {
     loadExisting();
   }, [editId, isEditMode]);
 
+  function fillFormFromParsed(parsed: any) {
+    if (parsed.name) setName(parsed.name);
+    if (parsed.time_minutes) setTimeMinutes(String(parsed.time_minutes));
+    if (parsed.servings) setServings(String(parsed.servings));
+    if (Array.isArray(parsed.ingredients)) {
+      setIngredients(
+        parsed.ingredients.map((ing: any, i: number) => ({
+          id: `ai-${i}`,
+          name: ing.name ?? '',
+          amount: ing.amount ?? '',
+        }))
+      );
+    }
+    if (Array.isArray(parsed.steps)) {
+      setSteps(
+        parsed.steps.map((step: string, i: number) => ({
+          id: `ai-${i}`,
+          text: step,
+        }))
+      );
+    }
+    setMode('manual');
+  }
+
+  async function handleParseText() {
+    if (!pasteText.trim()) {
+      Alert.alert('Nothing to parse', 'Paste a recipe first.');
+      return;
+    }
+    setParsing(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const response = await fetch(SUPABASE_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ text: pasteText }),
+      });
+      const parsed = await response.json();
+      if (parsed.error) throw new Error(parsed.error);
+      fillFormFromParsed(parsed);
+    } catch (err: any) {
+      Alert.alert('Parse failed', err.message ?? 'Could not extract recipe. Try again or enter manually.');
+    } finally {
+      setParsing(false);
+    }
+  }
+
+  async function handleParsePhoto() {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permission needed', 'Please allow camera access in Settings.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets[0]) return;
+
+    setParsing(true);
+    try {
+      const response = await fetch(result.assets[0].uri);
+      const blob = await response.blob();
+      const arrayBuffer = await new Response(blob).arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      const base64 = btoa(binary);
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const apiResponse = await fetch(SUPABASE_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ imageBase64: base64 }),
+      });
+      const parsed = await apiResponse.json();
+      if (parsed.error) throw new Error(parsed.error);
+      fillFormFromParsed(parsed);
+    } catch (err: any) {
+      Alert.alert('Parse failed', err.message ?? 'Could not read recipe from photo. Try again or enter manually.');
+    } finally {
+      setParsing(false);
+    }
+  }
+
   function toggleTag(tag: string) {
     const next = new Set(tags);
     next.has(tag) ? next.delete(tag) : next.add(tag);
@@ -113,28 +216,27 @@ export default function AddRecipeScreen() {
       quality: 0.8,
     });
     if (!result.canceled && result.assets[0]) {
-      setPhotoUri(result.assets[0].uri);
+      const asset = result.assets[0];
+      if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024) {
+        Alert.alert('Photo too large', 'Please choose a photo under 5MB.');
+        return;
+      }
+      setPhotoUri(asset.uri);
     }
   }
 
-  
   async function uploadPhoto(userId: string): Promise<string | null> {
     if (!photoUri) return existingPhotoUrl;
     try {
       const response = await fetch(photoUri);
       const blob = await response.blob();
-
       if (blob.size > 5 * 1024 * 1024) {
         Alert.alert('Photo too large', 'Please choose a photo under 5MB.');
         return existingPhotoUrl;
       }
-
       const arrayBuffer = await new Response(blob).arrayBuffer();
       const uint8Array = new Uint8Array(arrayBuffer);
       const fileName = `${userId}/${Date.now()}.jpg`;
-      console.log('Uploading to path:', fileName);
-      console.log('userId used:', userId);
-
       const { error } = await supabase.storage
         .from('recipe-photos')
         .upload(fileName, uint8Array, { contentType: 'image/jpeg', upsert: true });
@@ -142,8 +244,7 @@ export default function AddRecipeScreen() {
       const { data } = supabase.storage.from('recipe-photos').getPublicUrl(fileName);
       return data.publicUrl;
     } catch (err: any) {
-      console.error('Photo upload failed:', JSON.stringify(err, null, 2));
-      Alert.alert('Upload error', JSON.stringify({ message: err?.message, status: err?.status, statusCode: err?.statusCode, error: err?.error }, null, 2));
+      Alert.alert('Upload error', err?.message ?? 'Photo upload failed.');
       return null;
     }
   }
@@ -196,10 +297,86 @@ export default function AddRecipeScreen() {
 
   const displayPhoto = photoUri ?? existingPhotoUrl;
 
-  if (loadingExisting) {
+  if (loadingExisting || parsing) {
     return (
       <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
         <CookingLoader />
+        {parsing && <Text style={styles.parsingText}>Reading your recipe...</Text>}
+      </View>
+    );
+  }
+
+  if (mode === 'choose') {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Pressable onPress={() => router.back()}>
+            <Feather name="x" size={20} color="#6B6049" />
+          </Pressable>
+          <Text style={styles.headerTitle}>Add a recipe</Text>
+          <View style={{ width: 20 }} />
+        </View>
+        <View style={styles.chooseContainer}>
+          <Text style={styles.chooseTitle}>How do you want to add it?</Text>
+
+          <Pressable style={styles.chooseCard} onPress={() => setMode('manual')}>
+            <Feather name="edit-3" size={22} color="#3A3570" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.chooseCardTitle}>Type it in</Text>
+              <Text style={styles.chooseCardSub}>Fill out the recipe form yourself</Text>
+            </View>
+            <Feather name="chevron-right" size={18} color="#B0A790" />
+          </Pressable>
+
+          <Pressable style={styles.chooseCard} onPress={() => setMode('paste')}>
+            <Feather name="clipboard" size={22} color="#3A3570" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.chooseCardTitle}>Paste recipe text</Text>
+              <Text style={styles.chooseCardSub}>Copy from a website or notes and we'll fill it in</Text>
+            </View>
+            <Feather name="chevron-right" size={18} color="#B0A790" />
+          </Pressable>
+
+          <Pressable style={styles.chooseCard} onPress={handleParsePhoto}>
+            <Feather name="camera" size={22} color="#3A3570" />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.chooseCardTitle}>Take a photo</Text>
+              <Text style={styles.chooseCardSub}>Snap a recipe card or cookbook page</Text>
+            </View>
+            <Feather name="chevron-right" size={18} color="#B0A790" />
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  if (mode === 'paste') {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Pressable onPress={() => setMode('choose')}>
+            <Feather name="arrow-left" size={20} color="#6B6049" />
+          </Pressable>
+          <Text style={styles.headerTitle}>Paste recipe</Text>
+          <View style={{ width: 20 }} />
+        </View>
+        <View style={{ flex: 1, paddingHorizontal: 18 }}>
+          <Text style={styles.pasteLabel}>
+            Copy a recipe from anywhere — a website, notes app, message — and paste it below.
+          </Text>
+          <TextInput
+            style={styles.pasteInput}
+            placeholder="Paste recipe text here..."
+            value={pasteText}
+            onChangeText={setPasteText}
+            multiline
+            textAlignVertical="top"
+            autoFocus
+          />
+          <Pressable style={styles.saveBtn} onPress={handleParseText} disabled={parsing}>
+            <Text style={styles.saveBtnText}>Extract recipe</Text>
+          </Pressable>
+        </View>
       </View>
     );
   }
@@ -207,14 +384,19 @@ export default function AddRecipeScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()}>
-          <Feather name="x" size={20} color="#6B6049" />
+        <Pressable onPress={() => isEditMode ? router.back() : setMode('choose')}>
+          <Feather name={isEditMode ? 'x' : 'arrow-left'} size={20} color="#6B6049" />
         </Pressable>
         <Text style={styles.headerTitle}>{isEditMode ? 'Edit recipe' : 'Add a recipe'}</Text>
         <View style={{ width: 20 }} />
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40 }}>
+      <KeyboardAwareScrollView
+        contentContainerStyle={{ paddingHorizontal: 18, paddingBottom: 40 }}
+        enableOnAndroid
+        keyboardShouldPersistTaps="handled"
+        extraScrollHeight={20}
+      >
         <Pressable style={styles.photoBox} onPress={pickPhoto}>
           {displayPhoto ? (
             <Image source={{ uri: displayPhoto }} style={styles.photoPreview} />
@@ -333,7 +515,7 @@ export default function AddRecipeScreen() {
             {submitting ? 'Saving...' : isEditMode ? 'Save changes' : 'Save recipe'}
           </Text>
         </Pressable>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </View>
   );
 }
@@ -349,6 +531,35 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
   },
   headerTitle: { fontSize: 16, fontWeight: '500', color: '#3A322A' },
+  chooseContainer: { flex: 1, paddingHorizontal: 18, paddingTop: 24 },
+  chooseTitle: { fontSize: 18, fontWeight: '500', color: '#3A322A', marginBottom: 20 },
+  chooseCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    backgroundColor: '#FFFEFA',
+    borderWidth: 0.5,
+    borderColor: '#E2E0EE',
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 10,
+  },
+  chooseCardTitle: { fontSize: 14, fontWeight: '500', color: '#3A322A' },
+  chooseCardSub: { fontSize: 12, color: '#9C9180', marginTop: 2 },
+  pasteLabel: { fontSize: 13, color: '#6B6049', lineHeight: 19, marginBottom: 12, marginTop: 4 },
+  pasteInput: {
+    flex: 1,
+    backgroundColor: '#FFFEFA',
+    borderWidth: 0.5,
+    borderColor: '#E2E0EE',
+    borderRadius: 12,
+    padding: 14,
+    color: '#3A322A',
+    fontSize: 13,
+    marginBottom: 12,
+    maxHeight: 400,
+  },
+  parsingText: { fontSize: 13, color: '#9C9180', marginTop: 12 },
   photoBox: {
     height: 160,
     borderWidth: 1.5,

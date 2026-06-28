@@ -32,13 +32,13 @@ export default function CustomTabBar({ state, navigation }: any) {
                 onPress={() => navigation.navigate(route.name)}
                 style={styles.tabButton}
               >
-                <Feather name={iconName} size={24} color={isFocused ? '#3A3570' : '#9C9180'} />
+                <Feather name={iconName} size={26} color={isFocused ? '#3A3570' : '#9C9180'} />
               </Pressable>
             );
           })}
         </View>
         <Pressable style={styles.plusButton} onPress={() => setMenuOpen(true)}>
-          <Feather name="plus" size={24} color="#FFFEFA" />
+          <Feather name="plus" size={26} color="#FFFEFA" />
         </Pressable>
       </View>
 
@@ -75,19 +75,19 @@ const styles = StyleSheet.create({
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 36,
+    gap: 44,
     backgroundColor: '#FFFEFA',
     borderRadius: 999,
-    paddingVertical: 16,
-    paddingHorizontal: 34,
-    borderWidth: 0.5,
-    borderColor: '#E2E0EE',
+    paddingVertical: 20,
+    paddingHorizontal: 40,
+    borderWidth: 1,
+    borderColor: '#3A3570',
   },
   tabButton: { alignItems: 'center', justifyContent: 'center' },
   plusButton: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: '#3A3570',
     alignItems: 'center',
     justifyContent: 'center',
