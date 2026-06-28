@@ -1,63 +1,89 @@
-import OfflineBanner from '@/components/OfflineBanner';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import { supabase } from '@/lib/supabase';
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import * as Linking from 'expo-linking';
-import { Stack, useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
-import 'react-native-reanimated';
+import Feather from '@expo/vector-icons/Feather';
+import { Tabs, useRouter } from 'expo-router';
+import { Pressable, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-export default function RootLayout() {
-  const colorScheme = useColorScheme();
+export default function TabLayout() {
   const router = useRouter();
-
-  useEffect(() => {
-    const subscription = Linking.addEventListener('url', async ({ url }) => {
-      if (url.includes('type=recovery')) {
-        const params = new URLSearchParams(url.split('#')[1] ?? url.split('?')[1] ?? '');
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
-        if (accessToken && refreshToken) {
-          await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
-          router.replace('/new-password' as any);
-        }
-      }
-    });
-
-    Linking.getInitialURL().then(async (url) => {
-      if (url && url.includes('type=recovery')) {
-        const params = new URLSearchParams(url.split('#')[1] ?? url.split('?')[1] ?? '');
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
-        if (accessToken && refreshToken) {
-          await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
-          router.replace('/new-password' as any);
-        }
-      }
-    });
-
-    return () => subscription.remove();
-  }, []);
+  const insets = useSafeAreaInsets();
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen name="splash" options={{ headerShown: false }} />
-        <Stack.Screen name="login" options={{ headerShown: false }} />
-        <Stack.Screen name="reset-password" options={{ headerShown: false }} />
-        <Stack.Screen name="new-password" options={{ headerShown: false }} />
-        <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="settings" options={{ headerShown: false }} />
-        <Stack.Screen name="recipe-detail" options={{ headerShown: false }} />
-        <Stack.Screen name="add-ingredient" options={{ headerShown: false, presentation: 'modal' }} />
-        <Stack.Screen name="add-missing-ingredients" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', headerShown: false }} />
-      </Stack>
-      <StatusBar style="auto" />
-      <OfflineBanner />
-    </ThemeProvider>
+    <>
+      <Tabs
+        screenOptions={{
+          headerShown: false,
+          tabBarShowLabel: false,
+          tabBarActiveTintColor: '#3A3570',
+          tabBarInactiveTintColor: '#9C9180',
+          tabBarStyle: {
+            position: 'absolute',
+            bottom: insets.bottom + 12,
+            left: 20,
+            right: 86,
+            height: 56,
+            borderRadius: 999,
+            backgroundColor: '#FFFEFA',
+            borderWidth: 1.5,
+            borderColor: '#3A3570',
+            elevation: 8,
+            shadowColor: '#3A3570',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.12,
+            shadowRadius: 12,
+            paddingBottom: 0,
+          },
+        }}
+      >
+        <Tabs.Screen
+          name="index"
+          options={{
+            tabBarIcon: ({ color }) => <Feather name="moon" size={22} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="recipes"
+          options={{
+            tabBarIcon: ({ color }) => <Feather name="book-open" size={22} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="pantry"
+          options={{
+            tabBarIcon: ({ color }) => <Feather name="shopping-bag" size={22} color={color} />,
+          }}
+        />
+        <Tabs.Screen
+          name="feed"
+          options={{
+            tabBarIcon: ({ color }) => <Feather name="globe" size={22} color={color} />,
+          }}
+        />
+      </Tabs>
+
+      <Pressable
+        style={[styles.addBtn, { bottom: insets.bottom + 12 }]}
+        onPress={() => router.push('/modal' as any)}
+      >
+        <Feather name="plus" size={22} color="#FFFEFA" />
+      </Pressable>
+    </>
   );
 }
+
+const styles = StyleSheet.create({
+  addBtn: {
+    position: 'absolute',
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#3A3570',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#3A3570',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+});
