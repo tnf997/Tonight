@@ -30,6 +30,7 @@ type Recipe = {
   carbs_g: number | null;
   fat_g: number | null;
   photo_url: string | null;
+  last_cooked_at: string | null;
 };
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -40,6 +41,7 @@ const isIPad = Platform.OS === 'ios' && SCREEN_WIDTH >= 768;
 const BG = isIPad
   ? require('../../assets/images/home-bg-ipad.png')
   : require('../../assets/images/home-bg.png');
+const COOLDOWN_DAYS = 5;
 
 const STRIP_WORDS = [
   "great value", "rao's", "raos", "breakstone's", "breakstones",
@@ -76,6 +78,13 @@ function ingredientIsAvailable(ingredientName: string, pantryNames: string[]) {
   });
 }
 
+function isOffCooldown(recipe: Recipe) {
+  if (!recipe.last_cooked_at) return true;
+  const cookedAt = new Date(recipe.last_cooked_at).getTime();
+  const cutoff = Date.now() - COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
+  return cookedAt < cutoff;
+}
+
 export default function HomeScreen() {
   const router = useRouter();
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -105,7 +114,7 @@ export default function HomeScreen() {
       supabase.from('pantry_items').select('item_name').eq('user_id', userId).eq('status', 'have'),
       supabase
         .from('recipes')
-        .select('id, name, time_minutes, servings, tags, ingredients, steps, calories, protein_g, carbs_g, fat_g, photo_url')
+        .select('id, name, time_minutes, servings, tags, ingredients, steps, calories, protein_g, carbs_g, fat_g, photo_url, last_cooked_at')
         .eq('user_id', userId)
         .eq('meal_type', 'dinner')
         .order('created_at', { ascending: false }),
@@ -114,7 +123,8 @@ export default function HomeScreen() {
     const pantryNames = (pantryResult.data ?? []).map((row) => normalize(row.item_name));
     const allRecipes = (recipesResult.data ?? []) as Recipe[];
     const makeable = allRecipes.filter((recipe) =>
-      recipe.ingredients.every((ing) => ingredientIsAvailable(ing.name, pantryNames))
+      recipe.ingredients.every((ing) => ingredientIsAvailable(ing.name, pantryNames)) &&
+      isOffCooldown(recipe)
     );
 
     setTotalRecipeCount(allRecipes.length);
@@ -136,6 +146,10 @@ export default function HomeScreen() {
     Animated.spring(position, { toValue: { x: 0, y: 0 }, useNativeDriver: false }).start();
   }
 
+  async function markCooked(recipeId: string) {
+    await supabase.from('recipes').update({ last_cooked_at: new Date().toISOString() }).eq('id', recipeId);
+  }
+
   function advanceCard(picked: boolean) {
     const list = recipesRef.current;
     const index = currentIndexRef.current;
@@ -144,6 +158,7 @@ export default function HomeScreen() {
     setFlipped(false);
     setCurrentIndex((prev) => (prev + 1 < list.length ? prev + 1 : 0));
     if (picked && pickedRecipe) {
+      markCooked(pickedRecipe.id);
       router.push(`/recipe-detail?id=${pickedRecipe.id}&source=home` as any);
     }
   }
@@ -244,7 +259,7 @@ export default function HomeScreen() {
           <View style={styles.cardInner}>
             <View style={styles.backHeader}>
               <Pressable style={styles.flipBackBtn} onPress={() => setFlipped(false)}>
-                <Feather name="chevron-left" size={18} color="#3A3570" />
+                <Feather name="chevron-left" size={22} color="#FFFEFA" />
               </Pressable>
               <Text style={styles.backName}>{current.name}</Text>
             </View>
@@ -302,9 +317,16 @@ const styles = StyleSheet.create({
   recipeName: { fontSize: 18, fontWeight: '500', color: '#3A322A' },
   recipeMeta: { fontSize: 12, color: '#9C9180', marginTop: 4 },
   tapHint: { fontSize: 10, color: '#B0A790', textAlign: 'center', marginTop: 10 },
-  backHeader: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  backHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   backName: { fontSize: 16, fontWeight: '500', color: '#3A322A' },
-  flipBackBtn: { padding: 2 },
+  flipBackBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#3A3570',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   backMacros: { fontSize: 11, color: '#9C9180', marginTop: 4, marginBottom: 10 },
   sectionLabel: { fontSize: 10, fontWeight: '500', letterSpacing: 0.5, color: '#6B6049' },
   bodyText: { fontSize: 12, color: '#3A322A', marginTop: 4, lineHeight: 17 },
