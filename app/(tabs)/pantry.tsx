@@ -1,6 +1,5 @@
 import { supabase } from '@/lib/supabase';
 import Feather from '@expo/vector-icons/Feather';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import {
@@ -204,26 +203,31 @@ export default function PantryScreen() {
 
     if (!error && data) {
       setItems(data as PantryItem[]);
+      const pantryNames = (data as PantryItem[])
+        .filter((i) => i.status === 'have')
+        .map((i) => normalize(i.item_name));
 
-      const alreadySeen = await AsyncStorage.getItem('missing_ingredients_prompt_seen');
-      if (!alreadySeen) {
-        const pantryNames = (data as PantryItem[])
-          .filter((i) => i.status === 'have')
-          .map((i) => normalize(i.item_name));
+      const { data: recipes } = await supabase
+        .from('recipes')
+        .select('ingredients')
+        .eq('user_id', userId);
 
-        const { data: recipes } = await supabase
-          .from('recipes')
-          .select('ingredients')
+      if (recipes && recipes.length > 0) {
+        const allIngredients = (recipes as Recipe[]).flatMap((r) => r.ingredients.map((i) => i.name));
+        const unique = [...new Set(allIngredients.map((n) => normalize(n)).filter(Boolean))];
+        const missingFromPantry = unique.filter((ing) => !ingredientIsAvailable(ing, pantryNames));
+
+        const { data: seenRows } = await supabase
+          .from('seen_missing_ingredients')
+          .select('ingredient_name')
           .eq('user_id', userId);
+        const seenNames = new Set((seenRows ?? []).map((r: any) => r.ingredient_name));
 
-        if (recipes && recipes.length > 0) {
-          const allIngredients = (recipes as Recipe[]).flatMap((r) => r.ingredients.map((i) => i.name));
-          const unique = [...new Set(allIngredients.map((n) => normalize(n)).filter(Boolean))];
-          const missing = unique.filter((ing) => !ingredientIsAvailable(ing, pantryNames));
-          if (missing.length > 0) {
-            setMissingCount(missing.length);
-            setShowMissingPrompt(true);
-          }
+        const newlyMissing = missingFromPantry.filter((ing) => !seenNames.has(ing));
+
+        if (newlyMissing.length > 0) {
+          setMissingCount(newlyMissing.length);
+          setShowMissingPrompt(true);
         }
       }
     }
@@ -231,14 +235,39 @@ export default function PantryScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { fetchItems(); }, [fetchItems]));
+async function markCurrentMissingAsSeen() {
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) return;
+
+    const pantryNames = items
+      .filter((i) => i.status === 'have')
+      .map((i) => normalize(i.item_name));
+
+    const { data: recipes } = await supabase
+      .from('recipes')
+      .select('ingredients')
+      .eq('user_id', userId);
+
+    if (!recipes) return;
+
+    const allIngredients = (recipes as Recipe[]).flatMap((r) => r.ingredients.map((i) => i.name));
+    const unique = [...new Set(allIngredients.map((n) => normalize(n)).filter(Boolean))];
+    const missingFromPantry = unique.filter((ing) => !ingredientIsAvailable(ing, pantryNames));
+
+    if (missingFromPantry.length === 0) return;
+
+    const rows = missingFromPantry.map((name) => ({ user_id: userId, ingredient_name: name }));
+    await supabase.from('seen_missing_ingredients').upsert(rows, { onConflict: 'user_id,ingredient_name' });
+  }
 
   async function dismissPrompt() {
-    await AsyncStorage.setItem('missing_ingredients_prompt_seen', 'true');
+    await markCurrentMissingAsSeen();
     setShowMissingPrompt(false);
   }
 
   async function goToMissing() {
-    await AsyncStorage.setItem('missing_ingredients_prompt_seen', 'true');
+    await markCurrentMissingAsSeen();
     setShowMissingPrompt(false);
     router.push('/add-missing-ingredients' as any);
   }

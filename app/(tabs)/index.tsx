@@ -34,10 +34,19 @@ type Recipe = {
 };
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const CARD_WIDTH = Math.min(SCREEN_WIDTH * 0.8, 500);
-const CARD_HEIGHT = Math.min(SCREEN_HEIGHT * 0.6, 520);
-const SWIPE_THRESHOLD = CARD_WIDTH * 0.22;
 const isIPad = Platform.OS === 'ios' && SCREEN_WIDTH >= 768;
+
+// iPad gets a larger card cap and bigger text; iPhone sizing untouched
+const CARD_WIDTH = isIPad
+  ? Math.min(SCREEN_WIDTH * 0.55, 720)
+  : Math.min(SCREEN_WIDTH * 0.8, 500);
+const CARD_HEIGHT = isIPad
+  ? Math.min(SCREEN_HEIGHT * 0.7, 780)
+  : Math.min(SCREEN_HEIGHT * 0.6, 520);
+const SWIPE_THRESHOLD = CARD_WIDTH * 0.22;
+
+const FONT_SCALE = isIPad ? 1.45 : 1;
+
 const BG = isIPad
   ? require('../../assets/images/home-bg-ipad.png')
   : require('../../assets/images/home-bg.png');
@@ -259,7 +268,7 @@ export default function HomeScreen() {
           <View style={styles.cardInner}>
             <View style={styles.backHeader}>
               <Pressable style={styles.flipBackBtn} onPress={() => setFlipped(false)}>
-                <Feather name="chevron-left" size={22} color="#FFFEFA" />
+                <Feather name="chevron-left" size={22 * FONT_SCALE} color="#FFFEFA" />
               </Pressable>
               <Text style={styles.backName}>{current.name}</Text>
             </View>
@@ -311,26 +320,26 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFEFA',
     borderRadius: 20,
   },
-  cardInner: { flex: 1, padding: 14 },
+  cardInner: { flex: 1, padding: isIPad ? 22 : 14 },
   photoArea: { flex: 1, backgroundColor: '#ECE4D3', borderRadius: 14 },
-  cardFooter: { paddingTop: 12 },
-  recipeName: { fontSize: 18, fontWeight: '500', color: '#3A322A' },
-  recipeMeta: { fontSize: 12, color: '#9C9180', marginTop: 4 },
-  tapHint: { fontSize: 10, color: '#B0A790', textAlign: 'center', marginTop: 10 },
-  backHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  backName: { fontSize: 16, fontWeight: '500', color: '#3A322A' },
+  cardFooter: { paddingTop: isIPad ? 18 : 12 },
+  recipeName: { fontSize: 18 * FONT_SCALE, fontWeight: '500', color: '#3A322A' },
+  recipeMeta: { fontSize: 12 * FONT_SCALE, color: '#9C9180', marginTop: 4 },
+  tapHint: { fontSize: 10 * FONT_SCALE, color: '#B0A790', textAlign: 'center', marginTop: 10 },
+  backHeader: { flexDirection: 'row', alignItems: 'center', gap: isIPad ? 14 : 10 },
+  backName: { fontSize: 16 * FONT_SCALE, fontWeight: '500', color: '#3A322A' },
   flipBackBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 34 * FONT_SCALE,
+    height: 34 * FONT_SCALE,
+    borderRadius: 17 * FONT_SCALE,
     backgroundColor: '#3A3570',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backMacros: { fontSize: 11, color: '#9C9180', marginTop: 4, marginBottom: 10 },
-  sectionLabel: { fontSize: 10, fontWeight: '500', letterSpacing: 0.5, color: '#6B6049' },
-  bodyText: { fontSize: 12, color: '#3A322A', marginTop: 4, lineHeight: 17 },
-  swipeHint: { color: '#F2E9D8', fontSize: 11, marginTop: 18 },
-  emptyTitle: { color: '#F2E9D8', fontSize: 18, fontWeight: '500', marginBottom: 8, textAlign: 'center' },
-  emptyText: { color: '#E2E0EE', fontSize: 12, textAlign: 'center' },
+  backMacros: { fontSize: 11 * FONT_SCALE, color: '#9C9180', marginTop: 4, marginBottom: isIPad ? 16 : 10 },
+  sectionLabel: { fontSize: 10 * FONT_SCALE, fontWeight: '500', letterSpacing: 0.5, color: '#6B6049' },
+  bodyText: { fontSize: 12 * FONT_SCALE, color: '#3A322A', marginTop: 4, lineHeight: 17 * FONT_SCALE },
+  swipeHint: { color: '#F2E9D8', fontSize: 11 * FONT_SCALE, marginTop: 18 },
+  emptyTitle: { color: '#F2E9D8', fontSize: 18 * FONT_SCALE, fontWeight: '500', marginBottom: 8, textAlign: 'center' },
+  emptyText: { color: '#E2E0EE', fontSize: 12 * FONT_SCALE, textAlign: 'center' },
 });

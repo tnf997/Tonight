@@ -3,13 +3,13 @@ import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Pressable,
-    StyleSheet,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 
 type MissingIngredient = {
@@ -86,8 +86,9 @@ export default function AddMissingIngredientsScreen() {
         if (!norm || seen.has(norm)) continue;
         seen.add(norm);
         if (!ingredientIsAvailable(name, pantryNames)) {
+          const displayName = norm.charAt(0).toUpperCase() + norm.slice(1);
           missing.push({
-            name: name.trim(),
+            name: displayName,
             storage: 'shelf',
             selected: true,
           });
@@ -114,34 +115,47 @@ export default function AddMissingIngredientsScreen() {
 
   async function handleAddAll() {
     const selected = ingredients.filter((i) => i.selected);
-    if (selected.length === 0) {
-      Alert.alert('Nothing selected', 'Select at least one ingredient to add.');
+    const rejected = ingredients.filter((i) => !i.selected);
+
+    if (selected.length === 0 && rejected.length === 0) {
+      Alert.alert('Nothing to do', 'Select at least one ingredient to add.');
       return;
     }
+
     setSaving(true);
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id;
     if (!userId) { setSaving(false); return; }
 
-    const rows = selected.map((ing) => ({
-      user_id: userId,
-      item_name: ing.name,
-      category: 'Other',
-      storage_location: ing.storage,
-      status: 'have',
-    }));
-
-    const { error } = await supabase.from('pantry_items').insert(rows);
-    setSaving(false);
-
-    if (error) {
-      Alert.alert('Error', error.message);
-      return;
+    if (selected.length > 0) {
+      const rows = selected.map((ing) => ({
+        user_id: userId,
+        item_name: ing.name,
+        category: 'Other',
+        storage_location: ing.storage,
+        status: 'have',
+      }));
+      const { error } = await supabase.from('pantry_items').insert(rows);
+      if (error) {
+        Alert.alert('Error', error.message);
+        setSaving(false);
+        return;
+      }
     }
 
+    const allNowSeen = ingredients.map((ing) => ({
+      user_id: userId,
+      ingredient_name: normalize(ing.name),
+    }));
+    await supabase.from('seen_missing_ingredients').upsert(allNowSeen, { onConflict: 'user_id,ingredient_name' });
+
+    setSaving(false);
+
     Alert.alert(
-      'Added!',
-      `${selected.length} ingredient${selected.length !== 1 ? 's' : ''} added to your pantry.`,
+      'Done!',
+      selected.length > 0
+        ? `${selected.length} ingredient${selected.length !== 1 ? 's' : ''} added to your pantry.`
+        : 'Got it — those ingredients won\'t be suggested again.',
       [{ text: 'OK', onPress: () => router.back() }]
     );
   }
@@ -176,7 +190,7 @@ export default function AddMissingIngredientsScreen() {
       </View>
 
       <Text style={styles.subtitle}>
-        Select the ingredients you have and choose where you store them.
+        Select the ingredients you have and choose where you store them. Unchecked items won't be suggested again.
       </Text>
 
       <FlatList
@@ -221,7 +235,7 @@ export default function AddMissingIngredientsScreen() {
       <View style={styles.footer}>
         <Pressable style={styles.addBtn} onPress={handleAddAll} disabled={saving}>
           <Text style={styles.addBtnText}>
-            {saving ? 'Adding...' : `Add ${ingredients.filter(i => i.selected).length} to pantry`}
+            {saving ? 'Saving...' : `Add ${ingredients.filter(i => i.selected).length} to pantry`}
           </Text>
         </Pressable>
       </View>

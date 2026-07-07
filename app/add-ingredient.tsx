@@ -139,4 +139,4 @@ const styles = StyleSheet.create({
   chipTextSelected: { color: '#3B6D11' },
   saveBtn: { backgroundColor: '#3A3570', borderRadius: 999, paddingVertical: 12, alignItems: 'center' },
   saveBtnText: { color: '#FFFEFA', fontWeight: '500', fontSize: 13 },
-});
+}); 
