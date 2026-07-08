@@ -1,3 +1,4 @@
+import { scaleFont, scaleSpacing } from '@/constants/scale';
 import { supabase } from '@/lib/supabase';
 import Feather from '@expo/vector-icons/Feather';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -137,7 +138,7 @@ function PantryRow({
     <View style={rowStyles.wrapper}>
       <View style={rowStyles.actions}>
         <Pressable style={rowStyles.deleteBtn} onPress={() => { closeRow(); onDelete(); }}>
-          <Feather name="trash-2" size={18} color="#FFFEFA" />
+          <Feather name="trash-2" size={scaleFont(18)} color="#FFFEFA" />
           <Text style={rowStyles.actionText}>Delete</Text>
         </Pressable>
       </View>
@@ -152,7 +153,7 @@ function PantryRow({
           onPress={onToggle}
           style={[rowStyles.toggle, item.status === 'have' ? rowStyles.toggleHave : rowStyles.toggleNeed]}
         >
-          {item.status === 'have' && <Feather name="check" size={14} color="#FFFEFA" />}
+          {item.status === 'have' && <Feather name="check" size={scaleFont(14)} color="#FFFEFA" />}
         </Pressable>
       </Animated.View>
     </View>
@@ -163,7 +164,7 @@ const rowStyles = StyleSheet.create({
   wrapper: { marginBottom: 6, borderRadius: 12, overflow: 'hidden' },
   actions: { position: 'absolute', right: 0, top: 0, bottom: 0, width: ACTION_WIDTH },
   deleteBtn: { flex: 1, backgroundColor: '#A32D2D', alignItems: 'center', justifyContent: 'center', gap: 2 },
-  actionText: { color: '#FFFEFA', fontSize: 11, fontWeight: '500' },
+  actionText: { color: '#FFFEFA', fontSize: scaleFont(11), fontWeight: '500' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -171,11 +172,11 @@ const rowStyles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: '#E2E0EE',
     borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: scaleSpacing(10),
+    paddingHorizontal: scaleSpacing(12),
   },
-  itemName: { flex: 1, fontSize: 13, color: '#3A322A' },
-  toggle: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginLeft: 8 },
+  itemName: { flex: 1, fontSize: scaleFont(13), color: '#3A322A' },
+  toggle: { width: scaleFont(26), height: scaleFont(26), borderRadius: scaleFont(13), alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginLeft: 8 },
   toggleHave: { backgroundColor: '#639922' },
   toggleNeed: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: '#EF9F27' },
 });
@@ -203,6 +204,7 @@ export default function PantryScreen() {
 
     if (!error && data) {
       setItems(data as PantryItem[]);
+
       const pantryNames = (data as PantryItem[])
         .filter((i) => i.status === 'have')
         .map((i) => normalize(i.item_name));
@@ -235,7 +237,8 @@ export default function PantryScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { fetchItems(); }, [fetchItems]));
-async function markCurrentMissingAsSeen() {
+
+  async function markCurrentMissingAsSeen() {
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id;
     if (!userId) return;
@@ -258,7 +261,13 @@ async function markCurrentMissingAsSeen() {
     if (missingFromPantry.length === 0) return;
 
     const rows = missingFromPantry.map((name) => ({ user_id: userId, ingredient_name: name }));
-    await supabase.from('seen_missing_ingredients').upsert(rows, { onConflict: 'user_id,ingredient_name' });
+    const { error: seenError } = await supabase
+      .from('seen_missing_ingredients')
+      .upsert(rows, { onConflict: 'user_id,ingredient_name' });
+
+    if (seenError) {
+      Alert.alert('Warning', 'Could not save your preferences: ' + seenError.message);
+    }
   }
 
   async function dismissPrompt() {
@@ -329,7 +338,7 @@ async function markCurrentMissingAsSeen() {
       </View>
 
       <TextInput
-        style={[styles.search, { fontSize: 14, letterSpacing: 0 }]}
+        style={styles.search}
         placeholder="Search ingredients"
         value={search}
         onChangeText={setSearch}
@@ -340,7 +349,7 @@ async function markCurrentMissingAsSeen() {
           style={styles.addPromptBtn}
           onPress={() => router.push(`/add-ingredient?prefill=${encodeURIComponent(search.trim())}` as any)}
         >
-          <Feather name="plus" size={14} color="#FFFEFA" />
+          <Feather name="plus" size={scaleFont(14)} color="#FFFEFA" />
           <Text style={styles.addPromptText}>Add "{search.trim()}" to pantry</Text>
         </Pressable>
       )}
@@ -361,7 +370,7 @@ async function markCurrentMissingAsSeen() {
       <Modal visible={showMissingPrompt} transparent animationType="fade">
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
-            <Feather name="shopping-bag" size={22} color="#3A3570" style={{ marginBottom: 8 }} />
+            <Feather name="shopping-bag" size={scaleFont(22)} color="#3A3570" style={{ marginBottom: 8 }} />
             <Text style={styles.modalTitle}>Missing ingredients</Text>
             <Text style={styles.modalBody}>
               Your recipes have {missingCount} ingredient{missingCount !== 1 ? 's' : ''} not in your pantry yet. Want to add them now?
@@ -384,22 +393,22 @@ async function markCurrentMissingAsSeen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FBF6EA', paddingTop: 60 },
   loadingContainer: { flex: 1, backgroundColor: '#FBF6EA', justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 22, fontWeight: '500', color: '#3A3570', paddingHorizontal: 18, marginBottom: 8 },
+  title: { fontSize: scaleFont(22), fontWeight: '500', color: '#3A3570', paddingHorizontal: 18, marginBottom: 8 },
   tabRow: { flexDirection: 'row', gap: 6, paddingHorizontal: 18, marginBottom: 10, flexWrap: 'wrap' },
-  tab: { paddingVertical: 5, paddingHorizontal: 11, borderRadius: 999, backgroundColor: 'transparent', borderWidth: 0.5, borderColor: '#E2E0EE' },
+  tab: { paddingVertical: scaleSpacing(5), paddingHorizontal: scaleSpacing(11), borderRadius: 999, backgroundColor: 'transparent', borderWidth: 0.5, borderColor: '#E2E0EE' },
   tabActive: { backgroundColor: '#E2E0EE', borderWidth: 0 },
-  tabText: { fontSize: 11, color: '#9C9180' },
-  tabTextActive: { color: '#3A3570', fontWeight: '500' },
-  search: { height: 36, backgroundColor: '#FFFEFA', borderWidth: 0.5, borderColor: '#E2E0EE', borderRadius: 999, paddingHorizontal: 14, marginHorizontal: 18, marginBottom: 10 },
-  addPromptBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#3A3570', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 18, marginHorizontal: 18, marginBottom: 10 },
-  addPromptText: { fontSize: 13, color: '#FFFEFA', fontWeight: '500' },
+  tabText: { fontSize: scaleFont(11), color: '#9C9180' },
+  tabTextActive: { fontSize: scaleFont(11), color: '#3A3570', fontWeight: '500' },
+  search: { height: scaleFont(36), backgroundColor: '#FFFEFA', borderWidth: 0.5, borderColor: '#E2E0EE', borderRadius: 999, paddingHorizontal: scaleSpacing(14), marginHorizontal: 18, marginBottom: 10, fontSize: scaleFont(14) },
+  addPromptBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#3A3570', borderRadius: 999, paddingVertical: scaleSpacing(10), paddingHorizontal: scaleSpacing(18), marginHorizontal: 18, marginBottom: 10 },
+  addPromptText: { fontSize: scaleFont(13), color: '#FFFEFA', fontWeight: '500' },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: 30 },
   modalCard: { backgroundColor: '#FFFEFA', borderRadius: 16, padding: 20, alignItems: 'center', width: '100%' },
-  modalTitle: { fontSize: 16, fontWeight: '500', color: '#3A322A', marginBottom: 8 },
-  modalBody: { fontSize: 13, color: '#6B6049', textAlign: 'center', lineHeight: 18, marginBottom: 18 },
+  modalTitle: { fontSize: scaleFont(16), fontWeight: '500', color: '#3A322A', marginBottom: 8 },
+  modalBody: { fontSize: scaleFont(13), color: '#6B6049', textAlign: 'center', lineHeight: 18, marginBottom: 18 },
   modalBtns: { flexDirection: 'row', gap: 10, width: '100%' },
-  modalSkip: { flex: 1, paddingVertical: 10, borderRadius: 999, borderWidth: 0.5, borderColor: '#E2E0EE', alignItems: 'center' },
-  modalSkipText: { fontSize: 13, color: '#6B6049' },
-  modalGo: { flex: 1, paddingVertical: 10, borderRadius: 999, backgroundColor: '#3A3570', alignItems: 'center' },
-  modalGoText: { fontSize: 13, color: '#FFFEFA', fontWeight: '500' },
+  modalSkip: { flex: 1, paddingVertical: scaleSpacing(10), borderRadius: 999, borderWidth: 0.5, borderColor: '#E2E0EE', alignItems: 'center' },
+  modalSkipText: { fontSize: scaleFont(13), color: '#6B6049' },
+  modalGo: { flex: 1, paddingVertical: scaleSpacing(10), borderRadius: 999, backgroundColor: '#3A3570', alignItems: 'center' },
+  modalGoText: { fontSize: scaleFont(13), color: '#FFFEFA', fontWeight: '500' },
 });

@@ -1,3 +1,4 @@
+import { scaleFont, scaleSpacing } from '@/constants/scale';
 import { supabase } from '@/lib/supabase';
 import Feather from '@expo/vector-icons/Feather';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -96,7 +97,7 @@ export default function RecipesScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>My recipes</Text>
         <Pressable style={styles.iconBtn} onPress={() => router.push('/settings' as any)}>
-          <Feather name="settings" size={26} color="#3A3570" />
+          <Feather name="settings" size={scaleFont(26)} color="#3A3570" />
         </Pressable>
       </View>
 
@@ -151,19 +152,19 @@ export default function RecipesScreen() {
               <View style={styles.rowActions}>
                 {!item.shared_to_feed && (
                   <Pressable style={styles.iconBtn} onPress={() => handleSharePress(item.id)}>
-                    <Feather name="share-2" size={22} color="#9C9180" />
+                    <Feather name="share-2" size={scaleFont(22)} color="#9C9180" />
                   </Pressable>
                 )}
                 {item.shared_to_feed && (
                   <View style={styles.sharedBadge}>
-                    <Feather name="globe" size={18} color="#3A3570" />
+                    <Feather name="globe" size={scaleFont(18)} color="#3A3570" />
                     {item.save_count > 0 && (
                       <Text style={styles.sharedCount}>{item.save_count}</Text>
                     )}
                   </View>
                 )}
                 <Pressable style={styles.iconBtn} onPress={() => handleDelete(item.id)}>
-                  <Feather name="trash-2" size={22} color="#9C9180" />
+                  <Feather name="trash-2" size={scaleFont(22)} color="#9C9180" />
                 </Pressable>
               </View>
             </Pressable>
@@ -174,7 +175,7 @@ export default function RecipesScreen() {
       <Modal visible={disclaimerVisible} transparent animationType="fade">
         <View style={styles.modalBackdrop}>
           <View style={styles.modalCard}>
-            <Feather name="share-2" size={22} color="#D85A30" style={{ marginBottom: 8 }} />
+            <Feather name="share-2" size={scaleFont(22)} color="#D85A30" style={{ marginBottom: 8 }} />
             <Text style={styles.modalTitle}>Sharing is permanent</Text>
             <Text style={styles.modalBody}>
               Once shared, other users can see and save this recipe. It can't be made private again.
@@ -209,20 +210,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     marginBottom: 8,
   },
-  title: { fontSize: 22, fontWeight: '500', color: '#3A3570' },
+  title: { fontSize: scaleFont(22), fontWeight: '500', color: '#3A3570' },
   tabScroll: { flexGrow: 0, marginBottom: 4 },
   tab: {
-    paddingVertical: 5,
-    paddingHorizontal: 12,
+    paddingVertical: scaleSpacing(5),
+    paddingHorizontal: scaleSpacing(12),
     borderRadius: 999,
     borderWidth: 0.5,
     borderColor: '#E2E0EE',
     backgroundColor: 'transparent',
   },
   tabActive: { backgroundColor: '#E2E0EE', borderWidth: 0 },
-  tabText: { fontSize: 11, color: '#9C9180' },
-  tabTextActive: { fontSize: 11, color: '#3A3570', fontWeight: '500' },
-  emptyText: { fontSize: 12, color: '#9C9180', paddingHorizontal: 18, marginTop: 20 },
+  tabText: { fontSize: scaleFont(11), color: '#9C9180' },
+  tabTextActive: { fontSize: scaleFont(11), color: '#3A3570', fontWeight: '500' },
+  emptyText: { fontSize: scaleFont(12), color: '#9C9180', paddingHorizontal: 18, marginTop: 20 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -230,24 +231,24 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: '#E2E0EE',
     borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
+    paddingVertical: scaleSpacing(10),
+    paddingHorizontal: scaleSpacing(12),
     marginBottom: 8,
   },
-  recipeName: { fontSize: 13, color: '#3A322A' },
+  recipeName: { fontSize: scaleFont(13), color: '#3A322A' },
   metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
-  recipeMeta: { fontSize: 11, color: '#9C9180' },
+  recipeMeta: { fontSize: scaleFont(11), color: '#9C9180' },
   rowActions: { flexDirection: 'row', gap: 12, alignItems: 'center' },
   sharedBadge: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  sharedCount: { fontSize: 11, color: '#3A3570' },
+  sharedCount: { fontSize: scaleFont(11), color: '#3A3570' },
   iconBtn: { padding: 6 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center', padding: 30 },
   modalCard: { backgroundColor: '#FFFEFA', borderRadius: 16, padding: 20, alignItems: 'center', width: '100%' },
-  modalTitle: { fontSize: 16, fontWeight: '500', color: '#3A322A', marginBottom: 8 },
-  modalBody: { fontSize: 12, color: '#6B6049', textAlign: 'center', lineHeight: 18, marginBottom: 18 },
+  modalTitle: { fontSize: scaleFont(16), fontWeight: '500', color: '#3A322A', marginBottom: 8 },
+  modalBody: { fontSize: scaleFont(12), color: '#6B6049', textAlign: 'center', lineHeight: 18, marginBottom: 18 },
   modalBtns: { flexDirection: 'row', gap: 10, width: '100%' },
   modalCancel: { flex: 1, paddingVertical: 10, borderRadius: 999, borderWidth: 0.5, borderColor: '#E2E0EE', alignItems: 'center' },
-  modalCancelText: { fontSize: 13, color: '#6B6049' },
+  modalCancelText: { fontSize: scaleFont(13), color: '#6B6049' },
   modalConfirm: { flex: 1, paddingVertical: 10, borderRadius: 999, backgroundColor: '#D85A30', alignItems: 'center' },
-  modalConfirmText: { fontSize: 13, color: '#FFFEFA', fontWeight: '500' },
+  modalConfirmText: { fontSize: scaleFont(13), color: '#FFFEFA', fontWeight: '500' },
 });
