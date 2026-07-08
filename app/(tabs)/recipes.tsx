@@ -1,3 +1,4 @@
+import TabGuideModal from '@/components/TabGuideModal';
 import { scaleFont, scaleSpacing } from '@/constants/scale';
 import { supabase } from '@/lib/supabase';
 import Feather from '@expo/vector-icons/Feather';
@@ -13,6 +14,7 @@ type Recipe = {
   meal_type: string;
   shared_to_feed: boolean;
   save_count: number;
+  ingredients: { name: string; amount: string }[];
 };
 
 const MEAL_TABS = [
@@ -32,29 +34,90 @@ const MEAL_LABELS: Record<string, string> = {
   lunch: 'Lunch',
 };
 
+const STRIP_WORDS = [
+  "great value", "rao's", "raos", "breakstone's", "breakstones",
+  "kraft", "heinz", "hunt's", "hunts", "del monte", "progresso",
+  "campbell's", "campbells", "barilla", "ronzoni", "classico",
+  "prego", "bertolli", "newman's own", "newmans own", "land o lakes",
+  "daisy", "philadelphia", "generic", "store brand",
+  "boneless", "skinless", "whole", "fresh", "frozen", "dried",
+  "canned", "jarred", "organic", "large", "small", "medium",
+  "extra", "lean", "ground", "shredded", "sliced", "diced",
+  "chopped", "minced", "cooked", "raw", "unsalted", "salted",
+  "low fat", "low-fat", "fat free", "fat-free", "reduced fat",
+  "stuffed", "cheese stuffed", "filled",
+];
+
+function normalize(text: string) {
+  let result = text.trim().toLowerCase().replace(/['']/g, '');
+  for (const word of STRIP_WORDS) {
+    result = result.replace(new RegExp(`\\b${word}\\b`, 'g'), '');
+  }
+  return result.replace(/\s+/g, ' ').trim();
+}
+
+function ingredientIsAvailable(ingredientName: string, pantryNames: string[]) {
+  const needed = normalize(ingredientName);
+  if (!needed) return true;
+  const neededWords = needed.split(' ').filter(Boolean);
+  return pantryNames.some((rawHave) => {
+    const have = normalize(rawHave);
+    if (!have) return false;
+    if (have === needed) return true;
+    if (have.includes(needed) || needed.includes(have)) return true;
+    return neededWords.some((word) => word.length > 3 && have.includes(word));
+  });
+}
+
 export default function RecipesScreen() {
   const router = useRouter();
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [pantryNames, setPantryNames] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
   const [disclaimerVisible, setDisclaimerVisible] = useState(false);
   const [pendingShareId, setPendingShareId] = useState<string | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
 
   const fetchRecipes = useCallback(async () => {
     setLoading(true);
     const { data: userData } = await supabase.auth.getUser();
     const userId = userData.user?.id;
     if (!userId) { setLoading(false); return; }
-    const { data, error } = await supabase
-      .from('recipes')
-      .select('id, name, time_minutes, meal_type, shared_to_feed, save_count')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-    if (!error && data) setRecipes(data as Recipe[]);
+
+    const [recipesResult, pantryResult] = await Promise.all([
+      supabase
+        .from('recipes')
+        .select('id, name, time_minutes, meal_type, shared_to_feed, save_count, ingredients')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false }),
+      supabase.from('pantry_items').select('item_name').eq('user_id', userId).eq('status', 'have'),
+    ]);
+
+    if (!recipesResult.error && recipesResult.data) setRecipes(recipesResult.data as Recipe[]);
+    setPantryNames((pantryResult.data ?? []).map((row: any) => normalize(row.item_name)));
     setLoading(false);
   }, []);
 
   useFocusEffect(useCallback(() => { fetchRecipes(); }, [fetchRecipes]));
+
+  useFocusEffect(useCallback(() => {
+    async function checkGuide() {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) return;
+      const { data } = await supabase.from('profiles').select('seen_recipes_guide').eq('id', userId).single();
+      if (data && !data.seen_recipes_guide) setShowGuide(true);
+    }
+    checkGuide();
+  }, []));
+
+  async function dismissGuide() {
+    setShowGuide(false);
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (userId) await supabase.from('profiles').update({ seen_recipes_guide: true }).eq('id', userId);
+  }
 
   async function handleSharePress(id: string) {
     const seen = await AsyncStorage.getItem('share_disclaimer_seen');
@@ -134,41 +197,48 @@ export default function RecipesScreen() {
           data={filtered}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{ paddingHorizontal: 18, paddingTop: 10 }}
-          renderItem={({ item }) => (
-            <Pressable
-              style={styles.row}
-              onPress={() => router.push(`/recipe-detail?id=${item.id}` as any)}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={styles.recipeName}>{item.name}</Text>
-                <View style={styles.metaRow}>
-                  {item.time_minutes != null && (
-                    <Text style={styles.recipeMeta}>{item.time_minutes} min</Text>
-                  )}
-                  {item.time_minutes != null && <Text style={styles.recipeMeta}> · </Text>}
-                  <Text style={styles.recipeMeta}>{MEAL_LABELS[item.meal_type] ?? item.meal_type}</Text>
-                </View>
-              </View>
-              <View style={styles.rowActions}>
-                {!item.shared_to_feed && (
-                  <Pressable style={styles.iconBtn} onPress={() => handleSharePress(item.id)}>
-                    <Feather name="share-2" size={scaleFont(22)} color="#9C9180" />
-                  </Pressable>
-                )}
-                {item.shared_to_feed && (
-                  <View style={styles.sharedBadge}>
-                    <Feather name="globe" size={scaleFont(18)} color="#3A3570" />
-                    {item.save_count > 0 && (
-                      <Text style={styles.sharedCount}>{item.save_count}</Text>
+          renderItem={({ item }) => {
+            const isMissingSomething = item.ingredients?.some(
+              (ing) => !ingredientIsAvailable(ing.name, pantryNames)
+            );
+            return (
+              <Pressable
+                style={styles.row}
+                onPress={() => router.push(`/recipe-detail?id=${item.id}` as any)}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.recipeName, isMissingSomething && styles.recipeNameMissing]}>
+                    {item.name}
+                  </Text>
+                  <View style={styles.metaRow}>
+                    {item.time_minutes != null && (
+                      <Text style={styles.recipeMeta}>{item.time_minutes} min</Text>
                     )}
+                    {item.time_minutes != null && <Text style={styles.recipeMeta}> · </Text>}
+                    <Text style={styles.recipeMeta}>{MEAL_LABELS[item.meal_type] ?? item.meal_type}</Text>
                   </View>
-                )}
-                <Pressable style={styles.iconBtn} onPress={() => handleDelete(item.id)}>
-                  <Feather name="trash-2" size={scaleFont(22)} color="#9C9180" />
-                </Pressable>
-              </View>
-            </Pressable>
-          )}
+                </View>
+                <View style={styles.rowActions}>
+                  {!item.shared_to_feed && (
+                    <Pressable style={styles.iconBtn} onPress={() => handleSharePress(item.id)}>
+                      <Feather name="share-2" size={scaleFont(22)} color="#9C9180" />
+                    </Pressable>
+                  )}
+                  {item.shared_to_feed && (
+                    <View style={styles.sharedBadge}>
+                      <Feather name="globe" size={scaleFont(18)} color="#3A3570" />
+                      {item.save_count > 0 && (
+                        <Text style={styles.sharedCount}>{item.save_count}</Text>
+                      )}
+                    </View>
+                  )}
+                  <Pressable style={styles.iconBtn} onPress={() => handleDelete(item.id)}>
+                    <Feather name="trash-2" size={scaleFont(22)} color="#9C9180" />
+                  </Pressable>
+                </View>
+              </Pressable>
+            );
+          }}
         />
       )}
 
@@ -197,6 +267,13 @@ export default function RecipesScreen() {
           </View>
         </View>
       </Modal>
+
+      <TabGuideModal
+        visible={showGuide}
+        title="Your recipes"
+        message="You can use the purple plus in the bottom right to add a recipe. Recipes that are missing ingredients will turn a different color, and inside it will show you what ingredient(s) you're missing."
+        onDismiss={dismissGuide}
+      />
     </View>
   );
 }
@@ -236,6 +313,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   recipeName: { fontSize: scaleFont(13), color: '#3A322A' },
+  recipeNameMissing: { color: '#D85A30', fontWeight: '500' },
   metaRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
   recipeMeta: { fontSize: scaleFont(11), color: '#9C9180' },
   rowActions: { flexDirection: 'row', gap: 12, alignItems: 'center' },

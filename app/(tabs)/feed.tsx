@@ -1,3 +1,4 @@
+import TabGuideModal from '@/components/TabGuideModal';
 import { supabase } from '@/lib/supabase';
 import Feather from '@expo/vector-icons/Feather';
 import { Image } from 'expo-image';
@@ -60,6 +61,7 @@ export default function FeedScreen() {
   const [dislikeInput, setDislikeInput] = useState('');
   const [savingId, setSavingId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [showGuide, setShowGuide] = useState(false);
 
   const fetchFeed = useCallback(async () => {
     setLoading(true);
@@ -81,6 +83,24 @@ export default function FeedScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { fetchFeed(); }, [fetchFeed]));
+
+  useFocusEffect(useCallback(() => {
+    async function checkGuide() {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) return;
+      const { data } = await supabase.from('profiles').select('seen_feed_guide').eq('id', userId).single();
+      if (data && !data.seen_feed_guide) setShowGuide(true);
+    }
+    checkGuide();
+  }, []));
+
+  async function dismissGuide() {
+    setShowGuide(false);
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (userId) await supabase.from('profiles').update({ seen_feed_guide: true }).eq('id', userId);
+  }
 
   function toggleDietary(tag: string) {
     const next = new Set(activeDietary);
@@ -347,6 +367,13 @@ export default function FeedScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      <TabGuideModal
+        visible={showGuide}
+        title="The feed"
+        message="You can share recipes and find others' recipes here. Once saved into your cookbook, you can change the recipe if you'd like."
+        onDismiss={dismissGuide}
+      />
     </View>
   );
 }

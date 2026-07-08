@@ -1,3 +1,4 @@
+import TabGuideModal from '@/components/TabGuideModal';
 import { getOptimizedPhotoUrl, supabase } from '@/lib/supabase';
 import Feather from '@expo/vector-icons/Feather';
 import { Image } from 'expo-image';
@@ -36,7 +37,6 @@ type Recipe = {
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const isIPad = Platform.OS === 'ios' && SCREEN_WIDTH >= 768;
 
-// iPad gets a larger card cap and bigger text; iPhone sizing untouched
 const CARD_WIDTH = isIPad
   ? Math.min(SCREEN_WIDTH * 0.55, 720)
   : Math.min(SCREEN_WIDTH * 0.8, 500);
@@ -101,6 +101,7 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState(true);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
 
   const flippedRef = useRef(false);
   flippedRef.current = flipped;
@@ -143,6 +144,24 @@ export default function HomeScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { fetchRecipes(); }, [fetchRecipes]));
+
+  useFocusEffect(useCallback(() => {
+    async function checkGuide() {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) return;
+      const { data } = await supabase.from('profiles').select('seen_home_guide').eq('id', userId).single();
+      if (data && !data.seen_home_guide) setShowGuide(true);
+    }
+    checkGuide();
+  }, []));
+
+  async function dismissGuide() {
+    setShowGuide(false);
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (userId) await supabase.from('profiles').update({ seen_home_guide: true }).eq('id', userId);
+  }
 
   useEffect(() => {
     const list = recipesRef.current;
@@ -205,10 +224,20 @@ export default function HomeScreen() {
     outputRange: ['-12deg', '0deg', '12deg'],
   });
 
+  const guideModal = (
+    <TabGuideModal
+      visible={showGuide}
+      title="How the swipe deck works"
+      message="Here you get to swipe through your available recipes — if you don't have the ingredients, it doesn't show! Tap the front of a recipe card to view ingredients and instructions, and tap back in the upper left corner. Once you've decided on a meal, swipe right and the recipe will fill your screen. Once a recipe is picked to cook, it won't show back up for 5 days."
+      onDismiss={dismissGuide}
+    />
+  );
+
   if (loading) {
     return (
       <ImageBackground source={BG} style={styles.container} resizeMode="cover">
         <ActivityIndicator color="#F2E9D8" />
+        {guideModal}
       </ImageBackground>
     );
   }
@@ -226,6 +255,7 @@ export default function HomeScreen() {
               : "Check your pantry, or add a recipe you can make with what's on hand."}
           </Text>
         </View>
+        {guideModal}
       </ImageBackground>
     );
   }
@@ -301,6 +331,7 @@ export default function HomeScreen() {
       </Animated.View>
 
       <Text style={styles.swipeHint}>← skip · pick for tonight →</Text>
+      {guideModal}
     </ImageBackground>
   );
 }

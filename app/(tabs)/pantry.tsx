@@ -1,3 +1,4 @@
+import TabGuideModal from '@/components/TabGuideModal';
 import { scaleFont, scaleSpacing } from '@/constants/scale';
 import { supabase } from '@/lib/supabase';
 import Feather from '@expo/vector-icons/Feather';
@@ -189,6 +190,7 @@ export default function PantryScreen() {
   const [activeFilter, setActiveFilter] = useState<'all' | 'cold' | 'frozen' | 'shelf' | 'need'>('all');
   const [showMissingPrompt, setShowMissingPrompt] = useState(false);
   const [missingCount, setMissingCount] = useState(0);
+  const [showGuide, setShowGuide] = useState(false);
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -237,6 +239,24 @@ export default function PantryScreen() {
   }, []);
 
   useFocusEffect(useCallback(() => { fetchItems(); }, [fetchItems]));
+
+  useFocusEffect(useCallback(() => {
+    async function checkGuide() {
+      const { data: userData } = await supabase.auth.getUser();
+      const userId = userData.user?.id;
+      if (!userId) return;
+      const { data } = await supabase.from('profiles').select('seen_pantry_guide').eq('id', userId).single();
+      if (data && !data.seen_pantry_guide) setShowGuide(true);
+    }
+    checkGuide();
+  }, []));
+
+  async function dismissGuide() {
+    setShowGuide(false);
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (userId) await supabase.from('profiles').update({ seen_pantry_guide: true }).eq('id', userId);
+  }
 
   async function markCurrentMissingAsSeen() {
     const { data: userData } = await supabase.auth.getUser();
@@ -386,6 +406,13 @@ export default function PantryScreen() {
           </View>
         </View>
       </Modal>
+
+      <TabGuideModal
+        visible={showGuide}
+        title="Your pantry"
+        message="Here is your pantry — it's important to keep this as up to date as possible so the swipe deck is accurate on what you can cook. You can search to add an ingredient, or use the purple plus in the bottom right."
+        onDismiss={dismissGuide}
+      />
     </View>
   );
 }
