@@ -163,6 +163,24 @@ export default function HomeScreen() {
     if (userId) await supabase.from('profiles').update({ seen_home_guide: true }).eq('id', userId);
   }
 
+  async function handleCalendarPress() {
+    const { data: userData } = await supabase.auth.getUser();
+    const userId = userData.user?.id;
+    if (!userId) return;
+
+    const { data } = await supabase
+      .from('profiles')
+      .select('planner_setup_complete')
+      .eq('id', userId)
+      .single();
+
+    if (data && !data.planner_setup_complete) {
+      router.push('/planner-setup' as any);
+    } else {
+      router.push('/planner' as any);
+    }
+  }
+
   useEffect(() => {
     const list = recipesRef.current;
     list.forEach((recipe) => {
@@ -233,9 +251,16 @@ export default function HomeScreen() {
     />
   );
 
+const calendarButton = (
+    <Pressable style={styles.calendarBtn} onPress={handleCalendarPress}>
+      <Feather name="calendar" size={26} color="#4FA8F5" />
+    </Pressable>
+  );
+
   if (loading) {
     return (
       <ImageBackground source={BG} style={styles.container} resizeMode="cover">
+        {calendarButton}
         <ActivityIndicator color="#F2E9D8" />
         {guideModal}
       </ImageBackground>
@@ -245,6 +270,7 @@ export default function HomeScreen() {
   if (recipes.length === 0) {
     return (
       <ImageBackground source={BG} style={styles.container} resizeMode="cover">
+        {calendarButton}
         <View style={styles.emptyCard}>
           <Text style={styles.emptyTitle}>
             {totalRecipeCount === 0 ? 'No recipes yet' : 'Nothing matches your pantry right now'}
@@ -264,6 +290,7 @@ export default function HomeScreen() {
 
   return (
     <ImageBackground source={BG} style={styles.container} resizeMode="cover">
+      {calendarButton}
       <Animated.View
         {...panResponder.panHandlers}
         style={[
@@ -338,6 +365,23 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  calendarBtn: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#1E1A38',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 4,
+  },
   emptyCard: {
     backgroundColor: 'rgba(30,26,56,0.75)',
     borderRadius: 16,

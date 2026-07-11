@@ -81,10 +81,12 @@ function PantryRow({
   item,
   onToggle,
   onDelete,
+  highlightColor,
 }: {
   item: PantryItem;
   onToggle: () => void;
   onDelete: () => void;
+  highlightColor?: string;
 }) {
   const translateX = useRef(new Animated.Value(SNAP_CLOSED)).current;
   const currentX = useRef(SNAP_CLOSED);
@@ -147,7 +149,14 @@ function PantryRow({
         {...panResponder.panHandlers}
         style={[rowStyles.row, { transform: [{ translateX }] }]}
       >
-        <Text style={rowStyles.itemName} numberOfLines={1} ellipsizeMode="tail">
+       <Text
+          style={[
+            rowStyles.itemName,
+            highlightColor ? { backgroundColor: highlightColor, paddingHorizontal: 4, borderRadius: 3 } : null,
+          ]}
+          numberOfLines={1}
+          ellipsizeMode="tail"
+        >
           {item.item_name}
         </Text>
         <Pressable
@@ -191,6 +200,8 @@ export default function PantryScreen() {
   const [showMissingPrompt, setShowMissingPrompt] = useState(false);
   const [missingCount, setMissingCount] = useState(0);
   const [showGuide, setShowGuide] = useState(false);
+ const [needSortDates, setNeedSortDates] = useState<Map<string, string>>(new Map());
+  const [highlightColor, setHighlightColor] = useState('#FCE3A8');
 
   const fetchItems = useCallback(async () => {
     setLoading(true);
@@ -234,6 +245,36 @@ export default function PantryScreen() {
           setShowMissingPrompt(true);
         }
       }
+
+      const todayKey = new Date().toISOString().split('T')[0];
+      const { data: plannedMeals } = await supabase
+        .from('planned_meals')
+        .select('date, recipes ( ingredients )')
+        .eq('user_id', userId)
+        .gte('date', todayKey)
+        .order('date', { ascending: true });
+
+      const sortMap = new Map<string, string>();
+      (plannedMeals ?? []).forEach((row: any) => {
+        const ingredients = row.recipes?.ingredients ?? [];
+        ingredients.forEach((ing: any) => {
+          const norm = normalize(ing.name);
+          if (!norm) return;
+          if (!sortMap.has(norm)) {
+            sortMap.set(norm, row.date);
+          }
+        });
+      });
+    setNeedSortDates(sortMap);
+
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('need_highlight_color')
+        .eq('id', userId)
+        .single();
+      if (profileData?.need_highlight_color) {
+        setHighlightColor(profileData.need_highlight_color);
+      }
     }
     setLoading(false);
   }, []);
@@ -258,45 +299,11 @@ export default function PantryScreen() {
     if (userId) await supabase.from('profiles').update({ seen_pantry_guide: true }).eq('id', userId);
   }
 
-  async function markCurrentMissingAsSeen() {
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData.user?.id;
-    if (!userId) return;
-
-    const pantryNames = items
-      .filter((i) => i.status === 'have')
-      .map((i) => normalize(i.item_name));
-
-    const { data: recipes } = await supabase
-      .from('recipes')
-      .select('ingredients')
-      .eq('user_id', userId);
-
-    if (!recipes) return;
-
-    const allIngredients = (recipes as Recipe[]).flatMap((r) => r.ingredients.map((i) => i.name));
-    const unique = [...new Set(allIngredients.map((n) => normalize(n)).filter(Boolean))];
-    const missingFromPantry = unique.filter((ing) => !ingredientIsAvailable(ing, pantryNames));
-
-    if (missingFromPantry.length === 0) return;
-
-    const rows = missingFromPantry.map((name) => ({ user_id: userId, ingredient_name: name }));
-    const { error: seenError } = await supabase
-      .from('seen_missing_ingredients')
-      .upsert(rows, { onConflict: 'user_id,ingredient_name' });
-
-    if (seenError) {
-      Alert.alert('Warning', 'Could not save your preferences: ' + seenError.message);
-    }
-  }
-
   async function dismissPrompt() {
-    await markCurrentMissingAsSeen();
     setShowMissingPrompt(false);
   }
 
   async function goToMissing() {
-    await markCurrentMissingAsSeen();
     setShowMissingPrompt(false);
     router.push('/add-missing-ingredients' as any);
   }
@@ -321,12 +328,23 @@ export default function PantryScreen() {
     ]);
   }
 
-  const filtered = items.filter((i) => {
+let filtered = items.filter((i) => {
     if (activeFilter === 'need') return i.status === 'need' && i.item_name.toLowerCase().includes(search.toLowerCase());
     const matchesFilter = activeFilter === 'all' || i.storage_location === activeFilter;
     const matchesSearch = i.item_name.toLowerCase().includes(search.toLowerCase());
     return matchesFilter && matchesSearch;
   });
+
+  if (activeFilter === 'need') {
+    filtered = [...filtered].sort((a, b) => {
+      const aDate = needSortDates.get(normalize(a.item_name));
+      const bDate = needSortDates.get(normalize(b.item_name));
+      if (aDate && bDate) return aDate.localeCompare(bDate);
+      if (aDate && !bDate) return -1;
+      if (!aDate && bDate) return 1;
+      return a.item_name.localeCompare(b.item_name);
+    });
+  }
 
   const showAddPrompt = search.trim().length > 0 && filtered.length === 0;
 
@@ -383,6 +401,11 @@ export default function PantryScreen() {
             item={item}
             onToggle={() => toggleStatus(item)}
             onDelete={() => handleDelete(item)}
+            highlightColor={
+              activeFilter === 'need' && needSortDates.has(normalize(item.item_name))
+                ? highlightColor
+                : undefined
+            }
           />
         )}
       />

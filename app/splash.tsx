@@ -9,7 +9,6 @@ const { width: W, height: H } = Dimensions.get('window');
 
 const FOODS = [
   require('../assets/images/splash-food-1.png'),
-  require('../assets/images/splash-food-2.png'),
 ];
 
 const STARS = [
