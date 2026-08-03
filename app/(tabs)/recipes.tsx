@@ -271,7 +271,8 @@ export default function RecipesScreen() {
       <TabGuideModal
         visible={showGuide}
         title="Your recipes"
-        message="You can use the purple plus in the bottom right to add a recipe. Recipes that are missing ingredients will turn a different color, and inside it will show you what ingredient(s) you're missing."
+        message="You can use the plus icon in the bottom right to add a recipe. Recipes that are missing ingredients will turn red
+        , and inside it will show you what ingredient(s) you're missing."
         onDismiss={dismissGuide}
       />
     </View>

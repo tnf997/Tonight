@@ -246,14 +246,17 @@ export default function HomeScreen() {
     <TabGuideModal
       visible={showGuide}
       title="How the swipe deck works"
-      message="Here you get to swipe through your available recipes — if you don't have the ingredients, it doesn't show! Tap the front of a recipe card to view ingredients and instructions, and tap back in the upper left corner. Once you've decided on a meal, swipe right and the recipe will fill your screen. Once a recipe is picked to cook, it won't show back up for 5 days."
+      message="Here you get to swipe through your available recipes if you don't have the ingredients,
+       it doesn't show! Tap the front of a recipe card to view ingredients and instructions, and tap back in the upper left corner.
+        Once you've decided on a meal, swipe right and the recipe will fill your screen. Once a recipe is picked to be cooked, it won't show back up for 5 days.
+        To reach settings go to Recipe book screen in the top right."
       onDismiss={dismissGuide}
     />
   );
 
 const calendarButton = (
     <Pressable style={styles.calendarBtn} onPress={handleCalendarPress}>
-      <Feather name="calendar" size={26} color="#4FA8F5" />
+      <Feather name="calendar" size={35} color="#3A3570" />
     </Pressable>
   );
 
@@ -343,7 +346,7 @@ const calendarButton = (
               <Text style={styles.sectionLabel}>INGREDIENTS</Text>
               {current.ingredients.map((ing, i) => (
                 <Text key={i} style={styles.bodyText}>
-                  • {ing.name}{ing.amount ? ` — ${ing.amount}` : ''}
+                  • {ing.amount ? `${ing.amount} ` : ''}{ing.name}
                 </Text>
               ))}
               <Text style={[styles.sectionLabel, { marginTop: 10 }]}>STEPS</Text>
@@ -365,14 +368,16 @@ const calendarButton = (
 
 const styles = StyleSheet.create({
   container: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  calendarBtn: {
+calendarBtn: {
     position: 'absolute',
     top: 60,
     right: 20,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#1E1A38',
+    width: 55,
+    height: 55,
+    borderRadius: 40,
+    backgroundColor: '#4FA8F5',
+    borderWidth: 2,
+    borderColor: '#3A3570',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 10,

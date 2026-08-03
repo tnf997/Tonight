@@ -128,11 +128,11 @@ export default function RecipeDetailScreen() {
         {macros.length > 0 && <Text style={styles.macros}>{macros.join(' · ')}</Text>}
 
         <Text style={styles.sectionLabel}>INGREDIENTS</Text>
-        {recipe.ingredients.map((ing, i) => {
+       {recipe.ingredients.map((ing, i) => {
           const missing = !ingredientIsAvailable(ing.name, pantryNames);
           return (
             <Text key={i} style={[styles.bodyText, missing && styles.missingText]}>
-              • {ing.name}{ing.amount ? ` — ${ing.amount}` : ''}
+              • {ing.amount ? `${ing.amount} ` : ''}{ing.name}
             </Text>
           );
         })}

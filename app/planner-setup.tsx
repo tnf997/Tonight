@@ -1,27 +1,25 @@
+import DatePickerGrid from '@/components/DatePickerGrid';
 import { supabase } from '@/lib/supabase';
 import Feather from '@expo/vector-icons/Feather';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-
-const DAYS = [
-  { label: 'Sunday', value: 0 },
-  { label: 'Monday', value: 1 },
-  { label: 'Tuesday', value: 2 },
-  { label: 'Wednesday', value: 3 },
-  { label: 'Thursday', value: 4 },
-  { label: 'Friday', value: 5 },
-  { label: 'Saturday', value: 6 },
-];
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 export default function PlannerSetupScreen() {
   const router = useRouter();
-  const [startDay, setStartDay] = useState<number | null>(null);
+  const [anchorDate, setAnchorDate] = useState<Date | null>(null);
   const [periodLength, setPeriodLength] = useState<1 | 2 | null>(null);
   const [saving, setSaving] = useState(false);
 
+  function formatDateKey(d: Date) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+
   async function handleContinue() {
-    if (startDay === null || periodLength === null || saving) return;
+    if (!anchorDate || periodLength === null || saving) return;
     setSaving(true);
 
     const { data: userData } = await supabase.auth.getUser();
@@ -31,7 +29,7 @@ export default function PlannerSetupScreen() {
     const { error } = await supabase
       .from('profiles')
       .update({
-        week_start_day: startDay,
+        planner_anchor_date: formatDateKey(anchorDate),
         planner_period_length: periodLength,
         planner_setup_complete: true,
       })
@@ -54,24 +52,12 @@ export default function PlannerSetupScreen() {
         <View style={{ width: 34 }} />
       </View>
 
-      <View style={styles.body}>
-        <Text style={styles.sectionLabel}>WHICH DAY DOES YOUR WEEK START ON?</Text>
-        <View style={styles.dayGrid}>
-          {DAYS.map((day) => {
-            const isSelected = startDay === day.value;
-            return (
-              <Pressable
-                key={day.value}
-                onPress={() => setStartDay(day.value)}
-                style={[styles.dayChip, isSelected && styles.dayChipSelected]}
-              >
-                <Text style={[styles.dayChipText, isSelected && styles.dayChipTextSelected]}>
-                  {day.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
+      <ScrollView contentContainerStyle={styles.body}>
+        <Text style={styles.sectionLabel}>WHEN DOES YOUR PLANNING PERIOD START?</Text>
+        <Text style={styles.helperText}>
+          Pick a date your planning cycle begins on — like your grocery shopping day. Future periods will repeat from this date.
+        </Text>
+        <DatePickerGrid value={anchorDate} onChange={setAnchorDate} />
 
         <Text style={[styles.sectionLabel, { marginTop: 28 }]}>HOW MANY WEEKS AT A TIME?</Text>
         <View style={styles.periodRow}>
@@ -90,13 +76,13 @@ export default function PlannerSetupScreen() {
             );
           })}
         </View>
-      </View>
+      </ScrollView>
 
       <View style={styles.footer}>
         <Pressable
-          style={[styles.continueBtn, (startDay === null || periodLength === null) && styles.continueBtnDisabled]}
+          style={[styles.continueBtn, (!anchorDate || periodLength === null) && styles.continueBtnDisabled]}
           onPress={handleContinue}
-          disabled={startDay === null || periodLength === null || saving}
+          disabled={!anchorDate || periodLength === null || saving}
         >
           <Text style={styles.continueBtnText}>
             {saving ? 'Saving...' : 'Continue'}
@@ -119,20 +105,9 @@ const styles = StyleSheet.create({
   },
   backIconBtn: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontSize: 16, fontWeight: '500', color: '#3A322A' },
-  body: { flex: 1, paddingHorizontal: 20, paddingTop: 10 },
-  sectionLabel: { fontSize: 11, fontWeight: '500', letterSpacing: 0.5, color: '#6B6049', marginBottom: 12 },
-  dayGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  dayChip: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 999,
-    backgroundColor: '#FFFEFA',
-    borderWidth: 0.5,
-    borderColor: '#E2E0EE',
-  },
-  dayChipSelected: { backgroundColor: '#3A3570', borderWidth: 0 },
-  dayChipText: { fontSize: 13, color: '#3A322A' },
-  dayChipTextSelected: { color: '#FFFEFA', fontWeight: '500' },
+  body: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 40 },
+  sectionLabel: { fontSize: 11, fontWeight: '500', letterSpacing: 0.5, color: '#6B6049', marginBottom: 8 },
+  helperText: { fontSize: 12, color: '#9C9180', lineHeight: 17, marginBottom: 14 },
   periodRow: { flexDirection: 'row', gap: 10 },
   periodChip: {
     flex: 1,

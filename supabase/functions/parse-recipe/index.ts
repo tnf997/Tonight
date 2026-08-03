@@ -11,7 +11,7 @@ serve(async (req) => {
   }
 
   try {
-    const { text, imageBase64 } = await req.json();
+  const { text, imageBase64, mediaType } = await req.json();
 
     const messages: any[] = [];
 
@@ -23,7 +23,7 @@ serve(async (req) => {
             type: 'image',
             source: {
               type: 'base64',
-              media_type: 'image/jpeg',
+              media_type: mediaType ?? 'image/jpeg',
               data: imageBase64,
             },
           },
@@ -48,25 +48,35 @@ serve(async (req) => {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
+        model: 'claude-sonnet-4-5',
         max_tokens: 1024,
         messages,
       }),
     });
 
     const data = await response.json();
+    console.log('Anthropic API response:', JSON.stringify(data));
+
+    if (data.error) {
+      return new Response(JSON.stringify({ error: `Anthropic API error: ${data.error.message}` }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const raw = data.content?.[0]?.text ?? '{}';
 
     let parsed;
     try {
       parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
     } catch {
-      parsed = {};
+      parsed = { error: 'Could not parse model response as JSON', raw };
     }
 
     return new Response(JSON.stringify(parsed), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
+
   } catch (err) {
     return new Response(JSON.stringify({ error: String(err) }), {
       status: 500,

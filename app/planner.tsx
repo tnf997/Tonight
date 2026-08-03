@@ -76,7 +76,7 @@ export default function PlannerScreen() {
   const router = useRouter();
   const [fontsLoaded] = useFonts({ Fraunces_600SemiBold });
   const [loading, setLoading] = useState(true);
-  const [weekStartDay, setWeekStartDay] = useState(0);
+
   const [periodLength, setPeriodLength] = useState(1);
   const [periodOffset, setPeriodOffset] = useState(0);
   const [days, setDays] = useState<PlannedDay[]>([]);
@@ -88,24 +88,25 @@ export default function PlannerScreen() {
     const userId = userData.user?.id;
     if (!userId) { setLoading(false); return; }
 
-    const { data: profile } = await supabase
+   const { data: profile } = await supabase
       .from('profiles')
-      .select('week_start_day, planner_period_length')
+      .select('planner_anchor_date, planner_period_length')
       .eq('id', userId)
       .single();
 
-    const startDayPref = profile?.week_start_day ?? 0;
     const lengthWeeks = profile?.planner_period_length ?? 1;
-    setWeekStartDay(startDayPref);
     setPeriodLength(lengthWeeks);
 
     const today = startOfDay(new Date());
-    const todayDow = today.getDay();
-    let daysSinceStart = todayDow - startDayPref;
-    if (daysSinceStart < 0) daysSinceStart += 7;
-    const currentPeriodStart = addDays(today, -daysSinceStart);
+    const anchorDate = profile?.planner_anchor_date
+      ? startOfDay(new Date(profile.planner_anchor_date + 'T00:00:00'))
+      : today;
 
     const totalDays = lengthWeeks * 7;
+    const daysSinceAnchor = Math.floor((today.getTime() - anchorDate.getTime()) / (1000 * 60 * 60 * 24));
+    const currentPeriodIndex = Math.floor(daysSinceAnchor / totalDays);
+    const currentPeriodStart = addDays(anchorDate, currentPeriodIndex * totalDays);
+
     const periodStart = addDays(currentPeriodStart, offset * totalDays);
 
     const dateList: Date[] = [];
@@ -222,10 +223,16 @@ export default function PlannerScreen() {
         </Pressable>
       </View>
 
-      <Pressable style={styles.favoritesRow}>
+      <Pressable
+        style={styles.favoritesRow}
+        onPress={() => {
+          const dateKeys = days.map((d) => formatDateKey(d.date));
+          router.push(`/planner-favorites?periodStartKeys=${encodeURIComponent(JSON.stringify(dateKeys))}&periodLength=${periodLength}` as any);
+        }}
+      >
         <Feather name="star" size={15} color="#85B7EB" />
         <Text style={styles.favoritesText}>Favorites</Text>
-      </Pressable>
+      </Pressable> 
 
       {loading ? (
         <ActivityIndicator color="#F2E9D8" style={{ marginTop: 30 }} />
@@ -243,8 +250,8 @@ export default function PlannerScreen() {
                   style={{ flex: 1 }}
                   onPress={() => router.push(`/planner-day?date=${formatDateKey(day.date)}` as any)}
                 >
-                  <Text style={[styles.dayLabel, day.isToday && styles.dayLabelToday]}>
-                    {DAY_NAMES[day.date.getDay()]}
+                 <Text style={[styles.dayLabel, day.isToday && styles.dayLabelToday]}>
+                    {DAY_NAMES[day.date.getDay()]} · {MONTH_NAMES[day.date.getMonth()]} {day.date.getDate()}
                   </Text>
                   {day.recipeName ? (
                     <Text style={[styles.dayContent, day.isToday && styles.dayContentToday]}>
@@ -292,7 +299,10 @@ export default function PlannerScreen() {
       <TabGuideModal
         visible={showGuide}
         title="Your meal planner"
-        message="Plan your week here! Tap any day to pick a recipe, or paste a link if you want to try something new. Missing ingredients for planned meals show up in your Pantry's Need tab, ordered by which meal needs them soonest. Save a lineup you love as a Favorite to reuse anytime."
+        message="Plan your week here! Tap any day to pick a recipe and cook, or paste a link if you want to try something new.
+         You can search recipes by name or by ingredient try searching 'beef' to see everything that uses it. Missing ingredients
+          for planned meals show up in your Pantry's Need tab, ordered by which ingredient is needed first. Loved this lineup? Save it as a Favorite
+           from the star button, and apply it to any future period."
         onDismiss={dismissGuide}
       />
     </View>

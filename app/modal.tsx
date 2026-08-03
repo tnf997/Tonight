@@ -1,6 +1,7 @@
 import CookingLoader from '@/components/CookingLoader';
 import { supabase } from '@/lib/supabase';
 import Feather from '@expo/vector-icons/Feather';
+import { File } from 'expo-file-system';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -21,6 +22,7 @@ type StepRow = { id: string; text: string };
 type Mode = 'choose' | 'manual' | 'paste' | 'photo';
 
 const SUPABASE_FUNCTION_URL = `https://zeygfnojyyajgmrfwqsh.supabase.co/functions/v1/parse-recipe`;
+console.log('DEBUG: modal.tsx module loaded, timestamp:', Date.now());
 
 export default function AddRecipeScreen() {
   const router = useRouter();
@@ -130,7 +132,8 @@ export default function AddRecipeScreen() {
     }
   }
 
- async function handleParsePhoto() {
+async function handleParsePhoto() {
+    console.log('DEBUG: handleParsePhoto called');
     Alert.alert(
       'Add recipe from photo',
       'Choose how to add your photo',
@@ -138,7 +141,9 @@ export default function AddRecipeScreen() {
         {
           text: 'Take a photo',
           onPress: async () => {
+            console.log('DEBUG: Take a photo pressed');
             const permission = await ImagePicker.requestCameraPermissionsAsync();
+            console.log('DEBUG: camera permission granted:', permission.granted);
             if (!permission.granted) {
               Alert.alert('Permission needed', 'Please allow camera access in Settings.');
               return;
@@ -147,6 +152,7 @@ export default function AddRecipeScreen() {
               mediaTypes: ImagePicker.MediaTypeOptions.Images,
               quality: 0.8,
             });
+            console.log('DEBUG: camera result canceled:', result.canceled);
             if (!result.canceled && result.assets[0]) {
               await processImage(result.assets[0].uri);
             }
@@ -155,7 +161,9 @@ export default function AddRecipeScreen() {
         {
           text: 'Choose from library',
           onPress: async () => {
+            console.log('DEBUG: Choose from library pressed');
             const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+            console.log('DEBUG: library permission granted:', permission.granted);
             if (!permission.granted) {
               Alert.alert('Permission needed', 'Please allow photo library access in Settings.');
               return;
@@ -164,6 +172,7 @@ export default function AddRecipeScreen() {
               mediaTypes: ImagePicker.MediaTypeOptions.Images,
               quality: 0.8,
             });
+            console.log('DEBUG: library result canceled:', result.canceled);
             if (!result.canceled && result.assets[0]) {
               await processImage(result.assets[0].uri);
             }
@@ -174,33 +183,39 @@ export default function AddRecipeScreen() {
     );
   }
 
-  async function processImage(uri: string) {
+ async function processImage(uri: string) {
     setParsing(true);
     try {
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      const arrayBuffer = await new Response(blob).arrayBuffer();
-      const bytes = new Uint8Array(arrayBuffer);
-      let binary = '';
-      for (let i = 0; i < bytes.byteLength; i++) {
-        binary += String.fromCharCode(bytes[i]);
-      }
-      const base64 = btoa(binary);
+      console.log('DEBUG: starting processImage, uri:', uri);
+
+     const file = new File(uri);
+      const base64 = await file.base64();
+      console.log('DEBUG: base64 length:', base64.length);
 
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData.session?.access_token;
+      console.log('DEBUG: token present:', !!token);
+
+      const extension = uri.split('.').pop()?.toLowerCase();
+      const mediaType = extension === 'png' ? 'image/png' : 'image/jpeg';
+
       const apiResponse = await fetch(SUPABASE_FUNCTION_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ imageBase64: base64 }),
+        body: JSON.stringify({ imageBase64: base64, mediaType }),
       });
+      console.log('DEBUG: response status:', apiResponse.status);
+
       const parsed = await apiResponse.json();
+      console.log('DEBUG: parsed result:', JSON.stringify(parsed));
+
       if (parsed.error) throw new Error(parsed.error);
       fillFormFromParsed(parsed);
     } catch (err: any) {
+      console.log('DEBUG: caught error:', err.message, err);
       Alert.alert('Parse failed', err.message ?? 'Could not read recipe from photo. Try again or enter manually.');
     } finally {
       setParsing(false);

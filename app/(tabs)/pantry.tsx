@@ -433,7 +433,8 @@ let filtered = items.filter((i) => {
       <TabGuideModal
         visible={showGuide}
         title="Your pantry"
-        message="Here is your pantry — it's important to keep this as up to date as possible so the swipe deck is accurate on what you can cook. You can search to add an ingredient, or use the purple plus in the bottom right."
+        message="Here is your pantry it's important to keep this as up to date as possible so the swipe deck is accurate on what you can cook.
+         You can search to add an ingredient, or use the purple plus in the bottom right."
         onDismiss={dismissGuide}
       />
     </View>

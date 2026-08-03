@@ -4,15 +4,15 @@ import Feather from '@expo/vector-icons/Feather';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
-    Alert,
-    FlatList,
-    Modal,
-    Pressable,
-    StyleSheet,
-    Text,
-    TextInput,
-    View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 
 type Recipe = {
@@ -110,6 +110,7 @@ export default function PlannerDayScreen() {
           .from('recipes')
           .select('id, name, meal_type, ingredients')
           .eq('user_id', userId)
+          .not('meal_type', 'in', '(appetizer,dessert)')
           .order('name', { ascending: true }),
         supabase
           .from('planned_meals')
@@ -350,9 +351,15 @@ export default function PlannerDayScreen() {
     ]);
   }
 
-  const filteredRecipes = recipes.filter((r) =>
-    r.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredRecipes = recipes.filter((r) => {
+    const query = search.toLowerCase().trim();
+    if (!query) return true;
+    const nameMatches = r.name.toLowerCase().includes(query);
+    const ingredientMatches = r.ingredients.some((ing) =>
+      ing.name.toLowerCase().includes(query)
+    );
+    return nameMatches || ingredientMatches;
+  });
 
   if (loading || !fontsLoaded) {
     return (
